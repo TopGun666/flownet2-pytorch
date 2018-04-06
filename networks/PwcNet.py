@@ -35,6 +35,7 @@ class PwcNet(nn.Module):
         # fixed size correlation layer
         # the correlation layer output is always (4+1)*(4+1) = 81
         self.corr = Correlation(pad_size=4, kernel_size=1, max_displacement=4, stride1=1, stride2=1, corr_multiply=1)
+        self.corr_activation = nn.LeakyReLU(0.1,inplace=True)
 
         # every dense block will have output that is
         # inplanes + 128 + 128 + 96 + 64 + outplanes = 448
@@ -64,7 +65,7 @@ class PwcNet(nn.Module):
         self.upsample_flow5to4 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=True)
         self.upsample_flow4to3 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=True)
         self.upsample_flow3to2 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=True)
-        self.upsample_flow2to0 = nn.ConvTranspose2d(1, 1, 8, 4, 2, bias=True)
+        self.upsample_flow2to0 = nn.ConvTranspose2d(1, 1, 8, 4, 2, bias=False)
         # the warping layer
         self.resample = Resample2d()
         # the context network
@@ -77,6 +78,17 @@ class PwcNet(nn.Module):
             conv(False, 64, 32),
             conv(False, 32, 2)
         )
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                if m.bias is not None:
+                    init.uniform(m.bias)
+                init.xavier_uniform(m.weight)
+
+            if isinstance(m, nn.ConvTranspose2d):
+                if m.bias is not None:
+                    init.uniform(m.bias)
+                init.xavier_uniform(m.weight)
 
     def forward(self, x):
         x1 = x[:,0:3,:,:]
@@ -109,7 +121,8 @@ class PwcNet(nn.Module):
         x2_conv6a = self.py_conv6(x2_conv5b)
         x2_conv6b = self.py_conv6_b(x2_conv6a)
         # Correlation 6 layer
-        out_corr6 = self.corr(x1_conv6b, x2_conv6b)
+        out_corr6 = self.corr_activation(self.corr(x1_conv6b, x2_conv6b))
+
         # DenseNet block 6
         out_conv6   = self.dense6(out_corr6)
         out_conv6_up = self.upsample_conv6to5(out_conv6)
@@ -120,7 +133,7 @@ class PwcNet(nn.Module):
         scale_5 = self.div_flow / float(1<<5)
         flow6s_up = scale_5 * flow6_up
         out_warp5 = self.resample(x2_conv5b, flow6s_up)
-        out_corr5 = self.corr(x1_conv5b, out_warp5)
+        out_corr5 = self.corr_activation(self.corr(x1_conv5b, out_warp5))
 
         concat5 = torch.cat((out_corr5, x1_conv5b, flow6_up, out_conv6_up), dim=1)
 
@@ -134,7 +147,7 @@ class PwcNet(nn.Module):
         scale_4 = self.div_flow / float(1<<4)
         flow5_ups = scale_4 * flow5_up
         out_warp4 = self.resample(x2_conv4b, flow5_ups)
-        out_corr4 = self.corr(x1_conv4b, out_warp4)
+        out_corr4 = self.corr_activation(self.corr(x1_conv4b, out_warp4))
 
         concat4 = torch.cat((out_corr4, x1_conv4b, flow5_up, out_conv5_up), dim=1)
 
@@ -148,7 +161,7 @@ class PwcNet(nn.Module):
         scale_3 = self.div_flow / float(1<<3)
         flow4_ups = scale_3 * flow4_up
         out_warp3 = self.resample(x2_conv3b, flow4_ups)
-        out_corr3 = self.corr(x1_conv3b, out_warp3)
+        out_corr3 = self.corr_activation(self.corr(x1_conv3b, out_warp3))
 
         concat3 = torch.cat((out_corr3, x1_conv3b, flow4_up, out_conv4_up), dim=1)
 
@@ -162,7 +175,7 @@ class PwcNet(nn.Module):
         scale_2 = self.div_flow / float(1<<2)
         flow3_ups= scale_2 * flow3_up
         out_warp2 = self.resample(x2_conv2b, flow3_ups)
-        out_corr2 = self.corr(x1_conv2b, out_warp2)
+        out_corr2 = self.corr_activation(self.corr(x1_conv2b, out_warp2))
 
         concat2 = torch.cat((out_corr2, x1_conv2b, flow3_up, out_conv3_up), dim=1)
 
@@ -199,7 +212,9 @@ class DenseBlock(nn.Module):
         out1 = self.conv1(x)
         cat1 = torch.cat((x, out1), dim=1)
         out2 = self.conv2(cat1)
-        cat2 = torch.cat((cat1, out2), dim=1)
+        # The concatenation in original PWC-prototxt is not always the same
+        # order. Pay attention to the concatenation order here
+        cat2 = torch.cat((out2, cat1), dim=1)
         out3 = self.conv3(cat2)
         cat3 = torch.cat((cat2, out3), dim=1)
         out4 = self.conv4(cat3)

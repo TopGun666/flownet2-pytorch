@@ -37,12 +37,6 @@ def deconv(in_planes, out_planes):
         nn.LeakyReLU(0.1,inplace=True)
     )
 
-def corr(pad_size, kernel_size, max_displacement, stride1, stride2, corr_multiply):
-    return nn.Sequential(
-        Correlation(pad_size=pad_size, kernel_size=kernel_size, max_displacement=max_displacement, stride1=stride1, stride2=stride2, corr_multiply=corr_multipy),
-        nn.LeakyReLU(0.1,inplace=True)
-    )
-
 class tofp16(nn.Module):
     def __init__(self):
         super(tofp16, self).__init__()
