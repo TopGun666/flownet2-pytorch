@@ -82,13 +82,13 @@ class PwcNet(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 if m.bias is not None:
-                    init.uniform(m.bias)
-                init.xavier_uniform(m.weight)
+                    init.kaiming_uniform(m.bias)
+                init.kaiming_uniform(m.weight)
 
             if isinstance(m, nn.ConvTranspose2d):
                 if m.bias is not None:
-                    init.uniform(m.bias)
-                init.xavier_uniform(m.weight)
+                    init.kaiming_uniform(m.bias)
+                init.kaiming_uniform(m.weight)
 
         self.upsample = nn.Upsample(scale_factor=4, mode='bilinear')
 
