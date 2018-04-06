@@ -1,5 +1,7 @@
 #!/usr/bin/env python2.7
 
+import sys
+sys.path.append('/home/zlv30/develop/flownet2/python')
 import caffe
 from caffe.proto import caffe_pb2
 import sys, os
@@ -29,7 +31,7 @@ from utils.param_utils import *
 
 width = 256
 height = 256
-keys = {'TARGET_WIDTH': width, 
+keys = {'TARGET_WIDTH': width,
         'TARGET_HEIGHT': height,
         'ADAPTED_WIDTH':width,
         'ADAPTED_HEIGHT':height,
