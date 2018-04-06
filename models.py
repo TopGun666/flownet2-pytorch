@@ -594,13 +594,7 @@ class FlowNetPWC(PwcNet.PwcNet):
         flow2 = self.predict_flow2(out_conv2)
 
         flow_mixed2 = flow_dc + flow2
-        B, _, H, W = flow_mixed2.shape
-        flow_x2 = flow_mixed2[:,0,:,:].contiguous().view(B, 1, H, W)
-        flow_y2 = flow_mixed2[:,1,:,:].contiguous().view(B, 1, H, W)
 
-        flow_x = self.upsample_flow2to0(flow_x2)
-        flow_y = self.upsample_flow2to0(flow_y2)
-
-        flow = torch.cat((flow_x, flow_y), dim=1)
+        flow = self.upsample(flow_mixed2)
 
         return flow * self.div_flow

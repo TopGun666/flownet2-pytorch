@@ -4,10 +4,10 @@ import numpy as np
 
 from correlation_package.modules.correlation import Correlation
 
-def conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, dilation=1):
+def conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, dilation=1, bias=False):
     if batchNorm:
         return nn.Sequential(
-            nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=(kernel_size-1)//2 + dilation-1, dilation=dilation, bias=False),
+            nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=(kernel_size-1)//2 + dilation-1, dilation=dilation, bias=bias),
             nn.BatchNorm2d(out_planes),
             nn.LeakyReLU(0.1,inplace=True)
         )

@@ -19,18 +19,18 @@ class PwcNet(nn.Module):
 
         self.div_flow = div_flow
 
-        self.py_conv1   = conv(False,  3, 16, stride=2)
-        self.py_conv1_b = conv(False, 16, 16)
-        self.py_conv2   = conv(False, 16, 32, stride=2)
-        self.py_conv2_b = conv(False, 32, 32)
-        self.py_conv3   = conv(False, 32, 64, stride=2)
-        self.py_conv3_b = conv(False, 64, 64)
-        self.py_conv4   = conv(False, 64, 96, stride=2)
-        self.py_conv4_b = conv(False, 96, 96)
-        self.py_conv5   = conv(False, 96, 128,stride=2)
-        self.py_conv5_b = conv(False, 128,128)
-        self.py_conv6   = conv(False, 128,196,stride=2)
-        self.py_conv6_b = conv(False, 196,196)
+        self.py_conv1   = conv(False,  3, 16, stride=2, bias=True)
+        self.py_conv1_b = conv(False, 16, 16, bias=True)
+        self.py_conv2   = conv(False, 16, 32, stride=2, bias=True)
+        self.py_conv2_b = conv(False, 32, 32, bias=True)
+        self.py_conv3   = conv(False, 32, 64, stride=2, bias=True)
+        self.py_conv3_b = conv(False, 64, 64, bias=True)
+        self.py_conv4   = conv(False, 64, 96, stride=2, bias=True)
+        self.py_conv4_b = conv(False, 96, 96, bias=True)
+        self.py_conv5   = conv(False, 96, 128,stride=2, bias=True)
+        self.py_conv5_b = conv(False, 128,128, bias=True)
+        self.py_conv6   = conv(False, 128,196,stride=2, bias=True)
+        self.py_conv6_b = conv(False, 196,196, bias=True)
 
         # fixed size correlation layer
         # the correlation layer output is always (4+1)*(4+1) = 81
@@ -49,10 +49,10 @@ class PwcNet(nn.Module):
         # the input channel is 81+32+2+2 =117
         self.dense2 = DenseBlock(False, 117, 32)
 
-        self.upsample_conv6to5 = deconv(81+448, 2)
-        self.upsample_conv5to4 = deconv(213+448, 2)
-        self.upsample_conv4to3 = deconv(181+448, 2)
-        self.upsample_conv3to2 = deconv(149+448, 2)
+        self.upsample_conv6to5 = nn.ConvTranspose2d(81+448,  2, 4, 2, 1, bias=True)
+        self.upsample_conv5to4 = nn.ConvTranspose2d(213+448, 2, 4, 2, 1, bias=True)
+        self.upsample_conv4to3 = nn.ConvTranspose2d(181+448, 2, 4, 2, 1, bias=True)
+        self.upsample_conv3to2 = nn.ConvTranspose2d(149+448, 2, 4, 2, 1, bias=True)
 
         self.predict_flow6 = predict_flow(448+81)
         self.predict_flow5 = predict_flow(448+81+128+2+2)
@@ -65,18 +65,18 @@ class PwcNet(nn.Module):
         self.upsample_flow5to4 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=True)
         self.upsample_flow4to3 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=True)
         self.upsample_flow3to2 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=True)
-        self.upsample_flow2to0 = nn.ConvTranspose2d(1, 1, 8, 4, 2, bias=False)
+
         # the warping layer
         self.resample = Resample2d()
         # the context network
         self.context_net = nn.Sequential(
-            conv(False, 117+448, 128),
-            conv(False, 128,128, dilation=2),
-            conv(False, 128,128, dilation=4),
-            conv(False, 128,96,  dilation=8),
-            conv(False, 96, 64,  dilation=16),
-            conv(False, 64, 32),
-            conv(False, 32, 2)
+            conv(False, 117+448, 128, bias=True),
+            conv(False, 128,128, dilation=2, bias=True),
+            conv(False, 128,128, dilation=4, bias=True),
+            conv(False, 128,96,  dilation=8, bias=True),
+            conv(False, 96, 64,  dilation=16, bias=True),
+            conv(False, 64, 32, bias=True),
+            nn.Conv2d(32, 2, 3, 1, 1, bias=True),
         )
 
         for m in self.modules():
@@ -89,6 +89,8 @@ class PwcNet(nn.Module):
                 if m.bias is not None:
                     init.uniform(m.bias)
                 init.xavier_uniform(m.weight)
+
+        self.upsample = nn.Upsample(scale_factor=4, mode='bilinear')
 
     def forward(self, x):
         x1 = x[:,0:3,:,:]
@@ -184,13 +186,7 @@ class PwcNet(nn.Module):
         flow2 = self.predict_flow2(out_conv2)
 
         flow_mixed2 = flow_dc + flow2
-        B, _, H, W = flow_mixed2.shape
-        flow_x2 = flow_mixed2[:,0,:,:].view(B, 1, H, W)
-        flow_y2 = flow_mixed2[:,1,:,:].view(B, 1, H, W)
-        flow_x = self.upsample_flow2to0(flow_x2)
-        flow_y = self.upsample_flow2to0(flow_y2)
-
-        flow = torch.cat((flow_x, flow_y), dim=1)
+        flow = self.upsample(flow_mixed2)
 
         if self.training:
             return flow, flow3, flow4, flow5, flow6
@@ -202,11 +198,11 @@ class DenseBlock(nn.Module):
     def __init__(self, batchNorm, inplanes, outplanes=32):
         super(DenseBlock, self).__init__()
 
-        self.conv1 = conv(batchNorm, inplanes, 128)
-        self.conv2 = conv(batchNorm, inplanes+128, 128)
-        self.conv3 = conv(batchNorm, inplanes+128+128, 96)
-        self.conv4 = conv(batchNorm, inplanes+128+128+96,  64)
-        self.conv5 = conv(batchNorm, inplanes+128+128+96+64,  outplanes)
+        self.conv1 = conv(batchNorm, inplanes, 128, bias=True)
+        self.conv2 = conv(batchNorm, inplanes+128, 128, bias=True)
+        self.conv3 = conv(batchNorm, inplanes+128+128, 96, bias=True)
+        self.conv4 = conv(batchNorm, inplanes+128+128+96, 64, bias=True)
+        self.conv5 = conv(batchNorm, inplanes+128+128+96+64, outplanes, bias=True)
 
     def forward(self, x):
         out1 = self.conv1(x)

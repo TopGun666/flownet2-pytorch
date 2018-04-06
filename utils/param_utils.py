@@ -284,7 +284,6 @@ def parse_pwcnet(modules, weights, biases, param_prefix=''):
     'upsample_flow5to4',
     'upsample_flow4to3',
     'upsample_flow3to2',
-    'upsample_flow2to0',
     # Context network
     'dc_conv1', 'dc_conv2', 'dc_conv3', 'dc_conv4',
     'dc_conv5', 'dc_conv6', 'dc_conv7'
