@@ -82,19 +82,19 @@ class PwcNet(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 if m.bias is not None:
-                    init.kaiming_uniform(m.bias)
+                    m.bias.data.zero_()
                 init.kaiming_uniform(m.weight)
 
             if isinstance(m, nn.ConvTranspose2d):
                 if m.bias is not None:
-                    init.kaiming_uniform(m.bias)
+                    m.bias.data.zero_()
                 init.kaiming_uniform(m.weight)
 
         self.upsample = nn.Upsample(scale_factor=4, mode='bilinear')
 
     def forward(self, x):
-        x1 = x[:,0:3,:,:]
-        x2 = x[:,3::,:,:]
+        x1 = x[:,:,0,:,:]
+        x2 = x[:,:,1,:,:]
 
         # encoder
         x1_conv1a = self.py_conv1(x1)
@@ -227,7 +227,7 @@ if __name__ == '__main__':
     net.cuda()
     net.train()
 
-    x = torch.ones((1, 6, 128, 128)).cuda()
+    x = torch.ones((1, 3, 2, 128, 128)).cuda()
     x = Variable(x, requires_grad=False)
 
     flow = net.forward(x)
