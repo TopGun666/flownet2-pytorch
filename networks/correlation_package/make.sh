@@ -1,6 +1,4 @@
-#!/usr/bin/env bash
 alias python='/home/zlv30/anaconda2/bin/python'
-
 
 TORCH=$(python -c "import os; import torch; print(os.path.dirname(torch.__file__))")
 
